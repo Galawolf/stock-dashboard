@@ -102,10 +102,10 @@ for ticker in sp100:
 
 
 # -----------------------------
-# Card CSS (smaller + fixed)
+# Card CSS (fixed + smaller)
 # -----------------------------
 
-card_css = """
+st.markdown("""
 <style>
 .card-grid {
     display: grid;
@@ -156,9 +156,7 @@ card_css = """
     font-weight: 600;
 }
 </style>
-"""
-
-st.markdown(card_css, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 
 # -----------------------------
@@ -191,19 +189,16 @@ def card_color(signal):
 # Render the Card Grid
 # -----------------------------
 
-st.write("### Market Overview")
-
-st.markdown('<div class="card-grid">', unsafe_allow_html=True)
+html_cards = '<div class="card-grid">'
 
 for stock in results:
     bg = card_color(stock["Signal"])
     icon = trend_icon(stock["Trend"])
 
-    card_html = f"""
+    html_cards += f"""
     <div class="stock-card" style="background:{bg}">
         <div class="ticker">{stock['Ticker']} <span style="float:right;">{icon}</span></div>
         <div class="company">S&P 100 Company</div>
-
         <div class="bottom-row">
             <div>Sent: {stock['Sentiment']}</div>
             <div class="signal-badge">{stock['Signal']}</div>
@@ -211,6 +206,6 @@ for stock in results:
     </div>
     """
 
-    st.markdown(card_html, unsafe_allow_html=True)
+html_cards += "</div>"
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown(html_cards, unsafe_allow_html=True)
