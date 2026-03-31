@@ -76,7 +76,7 @@ sp100 = [
 ]
 
 # -----------------------------
-# Build the Dashboard
+# Build the Card Grid Dashboard
 # -----------------------------
 
 st.write("Analyzing S&P 100... this may take ~20 seconds.")
@@ -89,25 +89,122 @@ for ticker in sp100:
         trend = compute_trend(data)
         headlines = get_news_headlines(ticker)
         sentiment = compute_sentiment(headlines)
-        label = classify(sentiment, trend)
+        signal = classify(sentiment, trend)
 
         results.append({
             "Ticker": ticker,
             "Trend": trend,
             "Sentiment": round(sentiment, 3),
-            "Signal": label
+            "Signal": signal
         })
     except Exception:
         pass
 
-df = pd.DataFrame(results)
+# -----------------------------
+# Card Styling (CSS)
+# -----------------------------
 
-def color_signal(val):
-    if val == "Potential Buy":
-        return "background-color: #b6f2b6"
-    elif val == "Avoid for Now":
-        return "background-color: #f7b6b6"
+card_css = """
+<style>
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-gap: 20px;
+    margin-top: 20px;
+}
+
+.stock-card {
+    border-radius: 14px;
+    padding: 18px;
+    color: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stock-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    cursor: pointer;
+}
+
+.ticker {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.company {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 12px;
+}
+
+.bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.signal-badge {
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.25);
+    font-size: 12px;
+    font-weight: 600;
+}
+</style>
+"""
+
+st.markdown(card_css, unsafe_allow_html=True)
+
+# -----------------------------
+# Trend Icons
+# -----------------------------
+
+def trend_icon(trend):
+    if trend == "Uptrend":
+        return "▲"
+    elif trend == "Downtrend":
+        return "▼"
     else:
-        return ""
+        return "•"
 
-st.dataframe(df.style.applymap(color_signal, subset=["Signal"]))
+# -----------------------------
+# Card Background Colors
+# -----------------------------
+
+def card_color(signal):
+    if signal == "Potential Buy":
+        return "#2ECC71"   # green
+    elif signal == "Avoid for Now":
+        return "#E74C3C"   # red
+    else:
+        return "#BDC3C7"   # gray
+
+# -----------------------------
+# Render the Card Grid
+# -----------------------------
+
+st.write("### Market Overview")
+
+st.markdown('<div class="card-grid">', unsafe_allow_html=True)
+
+for stock in results:
+    bg = card_color(stock["Signal"])
+    icon = trend_icon(stock["Trend"])
+
+    card_html = f"""
+    <div class="stock-card" style="background:{bg}">
+        <div class="ticker">{stock['Ticker']} <span style="float:right;">{icon}</span></div>
+        <div class="company">S&P 100 Company</div>
+
+        <div class="bottom-row">
+            <div>Sentiment: {stock['Sentiment']}</div>
+            <div class="signal-badge">{stock['Signal']}</div>
+        </div>
+    </div>
+    """
+
+    st.markdown(card_html, unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
