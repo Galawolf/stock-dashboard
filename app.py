@@ -114,7 +114,6 @@ if user_ticker:
 
     except Exception as e:
         st.error("Could not fetch data for that ticker. Check the symbol and try again.")
-
 # -----------------------------
 # 1. Define the S&P 100 universe
 # -----------------------------
