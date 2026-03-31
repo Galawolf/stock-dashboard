@@ -37,7 +37,7 @@ if user_ticker:
         st.write(f"**Sentiment Score:** {round(sentiment, 3)}")
         st.write(f"**Signal:** {label}")
 
-       # Show chart
+        # Show chart
         if not data.empty:
             st.line_chart(data["Close"])
         else:
@@ -49,6 +49,9 @@ if user_ticker:
             st.write(f"- {h}")
 
         st.write("---")
+
+    except Exception as e:
+        st.error("Could not fetch data for that ticker. Check the symbol and try again.")
 # -----------------------------
 # 1. Define the S&P 100 universe
 # -----------------------------
