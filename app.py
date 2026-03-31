@@ -15,6 +15,41 @@ st.set_page_config(page_title="Stock Trend & Sentiment Dashboard", layout="wide"
 st.title("📈 Stock Trend & Sentiment Dashboard (S&P 100)")
 
 # -----------------------------
+# Search Bar for Individual Stocks
+# -----------------------------
+st.subheader("🔍 Search for a Stock")
+
+user_ticker = st.text_input("Enter a stock ticker (e.g., AAPL, TSLA, NVDA):", "").upper()
+
+if user_ticker:
+    try:
+        st.write(f"### Results for {user_ticker}")
+
+        # Fetch data
+        data = get_price_data(user_ticker)
+        trend = compute_trend(data)
+        headlines = get_news_headlines(user_ticker)
+        sentiment = compute_sentiment(headlines)
+        label = classify(sentiment, trend)
+
+        # Display results
+        st.write(f"**Trend:** {trend}")
+        st.write(f"**Sentiment Score:** {round(sentiment, 3)}")
+        st.write(f"**Signal:** {label}")
+
+        # Show chart
+        st.line_chart(data["Close"])
+
+        # Show headlines
+        st.write("### Recent Headlines")
+        for h in headlines:
+            st.write(f"- {h}")
+
+        st.write("---")
+
+    except Exception as e:
+        st.error("Could not fetch data for that ticker. Check the symbol and try again.")
+# -----------------------------
 # 1. Define the S&P 100 universe
 # -----------------------------
 sp100 = [
