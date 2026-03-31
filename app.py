@@ -2,12 +2,15 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import feedparser
+import nltk
+
+# Download VADER lexicon
+nltk.download('vader_lexicon')
 
 # -----------------------------
-# Helper Functions (must be ABOVE the search bar)
+# Helper Functions
 # -----------------------------
 
 def get_price_data(ticker):
@@ -42,8 +45,7 @@ def get_news_headlines(ticker):
     """Pull free news headlines using RSS feeds."""
     feed_url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
     feed = feedparser.parse(feed_url)
-    headlines = [entry.title for entry in feed.entries[:5]]
-    return headlines
+    return [entry.title for entry in feed.entries[:5]]
 
 def compute_sentiment(headlines):
     """Compute average sentiment score from headlines."""
@@ -61,12 +63,6 @@ def classify(sentiment, trend):
         return "Avoid for Now"
     else:
         return "Watch"
-        
-# Download VADER lexicon if needed
-import nltk
-nltk.download('vader_lexicon')
-
-
 
 # -----------------------------
 # Page Layout
@@ -79,6 +75,7 @@ st.title("📈 Stock Trend & Sentiment Dashboard (S&P 100)")
 # -----------------------------
 # Search Bar for Individual Stocks
 # -----------------------------
+
 st.subheader("🔍 Search for a Stock")
 
 user_ticker = st.text_input("Enter a stock ticker (e.g., AAPL, TSLA, NVDA):", "").upper()
@@ -112,11 +109,13 @@ if user_ticker:
 
         st.write("---")
 
-    except Exception as e:
+    except Exception:
         st.error("Could not fetch data for that ticker. Check the symbol and try again.")
+
 # -----------------------------
-# 1. Define the S&P 100 universe
+# S&P 100 Universe
 # -----------------------------
+
 sp100 = [
     "AAPL","MSFT","AMZN","GOOGL","GOOG","BRK-B","NVDA","META","TSLA","UNH",
     "JNJ","V","XOM","JPM","PG","MA","HD","CVX","LLY","ABBV",
@@ -131,12 +130,12 @@ sp100 = [
 ]
 
 # -----------------------------
-# 3. Build the dashboard
+# Build the Dashboard
 # -----------------------------
 
-results = []
-
 st.write("Analyzing S&P 100... this may take ~20 seconds.")
+
+results = []
 
 for ticker in sp100:
     try:
