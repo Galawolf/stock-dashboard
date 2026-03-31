@@ -6,10 +6,6 @@ from datetime import datetime, timedelta
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import feedparser
 
-# Download VADER lexicon if needed
-import nltk
-nltk.download('vader_lexicon')
-
 # -----------------------------
 # Helper Functions (must be ABOVE the search bar)
 # -----------------------------
@@ -65,6 +61,12 @@ def classify(sentiment, trend):
         return "Avoid for Now"
     else:
         return "Watch"
+        
+# Download VADER lexicon if needed
+import nltk
+nltk.download('vader_lexicon')
+
+
 
 # -----------------------------
 # Page Layout
