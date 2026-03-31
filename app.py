@@ -49,9 +49,6 @@ if user_ticker:
             st.write(f"- {h}")
 
         st.write("---")
-
-    except Exception as e:
-        st.error("Could not fetch data for that ticker. Check the symbol and try again.")
 # -----------------------------
 # 1. Define the S&P 100 universe
 # -----------------------------
