@@ -38,7 +38,10 @@ if user_ticker:
         st.write(f"**Signal:** {label}")
 
         # Show chart
-        st.line_chart(data["Close"])
+        if not data.empty:
+    st.line_chart(data["Close"])
+else:
+    st.warning("No price data available for this ticker.")
 
         # Show headlines
         st.write("### Recent Headlines")
@@ -70,9 +73,14 @@ sp100 = [
 # -----------------------------
 
 def get_price_data(ticker):
-    """Fetch recent price data."""
-    data = yf.download(ticker, period="6mo", interval="1d")
-    return data
+    """Fetch recent price data with fallback."""
+    try:
+        data = yf.download(ticker, period="6mo", interval="1d", progress=False)
+        if data is None or data.empty:
+            data = yf.download(ticker, period="1y", interval="1d", progress=False)
+        return data
+    except Exception:
+        return pd.DataFrame()
 
 def compute_trend(data):
     """Compute simple trend score using moving averages."""
