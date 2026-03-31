@@ -100,62 +100,66 @@ for ticker in sp100:
     except Exception:
         pass
 
+
 # -----------------------------
-# Card Styling (CSS)
+# Card CSS (smaller + fixed)
 # -----------------------------
 
 card_css = """
 <style>
 .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    grid-gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-gap: 16px;
     margin-top: 20px;
 }
 
 .stock-card {
-    border-radius: 14px;
-    padding: 18px;
+    border-radius: 12px;
+    padding: 14px;
     color: white;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    height: 130px;
 }
 
 .stock-card:hover {
     transform: scale(1.03);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
     cursor: pointer;
 }
 
 .ticker {
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .company {
-    font-size: 14px;
+    font-size: 12px;
     opacity: 0.85;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .bottom-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 12px;
 }
 
 .signal-badge {
-    padding: 4px 8px;
-    border-radius: 8px;
+    padding: 3px 6px;
+    border-radius: 6px;
     background: rgba(255,255,255,0.25);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
 }
 </style>
 """
 
 st.markdown(card_css, unsafe_allow_html=True)
+
 
 # -----------------------------
 # Trend Icons
@@ -169,17 +173,19 @@ def trend_icon(trend):
     else:
         return "•"
 
+
 # -----------------------------
 # Card Background Colors
 # -----------------------------
 
 def card_color(signal):
     if signal == "Potential Buy":
-        return "#2ECC71"   # green
+        return "#2ECC71"
     elif signal == "Avoid for Now":
-        return "#E74C3C"   # red
+        return "#E74C3C"
     else:
-        return "#BDC3C7"   # gray
+        return "#BDC3C7"
+
 
 # -----------------------------
 # Render the Card Grid
@@ -199,7 +205,7 @@ for stock in results:
         <div class="company">S&P 100 Company</div>
 
         <div class="bottom-row">
-            <div>Sentiment: {stock['Sentiment']}</div>
+            <div>Sent: {stock['Sentiment']}</div>
             <div class="signal-badge">{stock['Signal']}</div>
         </div>
     </div>
