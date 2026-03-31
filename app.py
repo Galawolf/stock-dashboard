@@ -37,8 +37,8 @@ if user_ticker:
         st.write(f"**Sentiment Score:** {round(sentiment, 3)}")
         st.write(f"**Signal:** {label}")
 
-        # Show chart
-        if not data.empty:
+   # Show chart
+if not data.empty:
     st.line_chart(data["Close"])
 else:
     st.warning("No price data available for this ticker.")
