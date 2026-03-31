@@ -102,7 +102,7 @@ for ticker in sp100:
 
 
 # -----------------------------
-# Card CSS (fixed + smaller)
+# Card CSS
 # -----------------------------
 
 st.markdown("""
@@ -186,7 +186,7 @@ def card_color(signal):
 
 
 # -----------------------------
-# Render the Card Grid
+# Render the Card Grid (SAFE VERSION)
 # -----------------------------
 
 html_cards = '<div class="card-grid">'
@@ -195,16 +195,16 @@ for stock in results:
     bg = card_color(stock["Signal"])
     icon = trend_icon(stock["Trend"])
 
-    html_cards += f"""
-    <div class="stock-card" style="background:{bg}">
-        <div class="ticker">{stock['Ticker']} <span style="float:right;">{icon}</span></div>
-        <div class="company">S&P 100 Company</div>
-        <div class="bottom-row">
-            <div>Sent: {stock['Sentiment']}</div>
-            <div class="signal-badge">{stock['Signal']}</div>
-        </div>
-    </div>
-    """
+    html_cards += (
+        f'<div class="stock-card" style="background:{bg}">'
+        f'<div class="ticker">{stock["Ticker"]}<span style="float:right;">{icon}</span></div>'
+        f'<div class="company">S&P 100 Company</div>'
+        f'<div class="bottom-row">'
+        f'<div>Sent: {stock["Sentiment"]}</div>'
+        f'<div class="signal-badge">{stock["Signal"]}</div>'
+        f'</div>'
+        f'</div>'
+    )
 
 html_cards += "</div>"
 
