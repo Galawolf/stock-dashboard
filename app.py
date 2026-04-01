@@ -183,3 +183,5 @@ st.markdown(html_grid, unsafe_allow_html=True)
 
 st.divider()
 st.caption(f"Last Full Scan: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+# Add the unsafe_allow_html=True parameter
+st.markdown(html_grid, unsafe_allow_html=True)
