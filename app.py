@@ -3,13 +3,13 @@ import pandas as pd
 import yfinance as yf
 import requests
 import datetime as dt
-import torch
-
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-from nltk.sentiment import SentimentIntensityAnalyzer
 import nltk
 
-# Make sure VADER is available
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
+import tensorflow as tf
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+# Download VADER lexicon
 nltk.download("vader_lexicon", quiet=True)
 
 st.set_page_config(page_title="Stock Trend & Sentiment Dashboard", layout="wide")
@@ -29,34 +29,26 @@ sp100 = [
     "C","EL","ADP","REGN","BDX","CI","SO","DUK","CL","USB",
     "PNC","CB","TGT","FIS","EQIX","ICE","APD","CSX","NSC","FDX"
 ]
-# If you already have a full sp100 list, keep yours instead of this.
+# Replace with your full S&P 100 list if you already have it.
 
 
 # -----------------------------
-# Caching & Models
+# Load Models (Cached)
 # -----------------------------
 
 @st.cache_resource
-def load_finbert_pipeline():
-    device = 0 if torch.cuda.is_available() else -1
-    model_name = "ProsusAI/finbert"
+def load_finbert_tone():
+    model_name = "yiyanghkust/finbert-tone"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name)
-    nlp = pipeline(
-        "text-classification",
-        model=model,
-        tokenizer=tokenizer,
-        return_all_scores=True,
-        device=device
-    )
-    return nlp
+    model = TFAutoModelForSequenceClassification.from_pretrained(model_name)
+    return tokenizer, model
 
 @st.cache_resource
 def load_vader():
     return SentimentIntensityAnalyzer()
 
 
-finbert_pipeline = load_finbert_pipeline()
+tokenizer, finbert_model = load_finbert_tone()
 vader = load_vader()
 
 
@@ -70,9 +62,6 @@ def get_price_data(ticker, period="6mo", interval="1d"):
 
 @st.cache_data(show_spinner=False)
 def get_news_headlines(ticker, max_headlines=15):
-    """
-    Simple Google News RSS fetcher.
-    """
     url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
     resp = requests.get(url, timeout=10)
     headlines = []
@@ -93,25 +82,19 @@ def get_news_headlines(ticker, max_headlines=15):
 # -----------------------------
 
 def vader_sentiment(text: str) -> float:
-    scores = vader.polarity_scores(text)
-    return scores["compound"]  # -1 to 1
+    return vader.polarity_scores(text)["compound"]
 
-def finbert_sentiment(text: str) -> float:
-    """
-    Map FinBERT scores to a single value in [-1, 1].
-    """
-    outputs = finbert_pipeline(text)[0]  # list of dicts
-    score_map = {}
-    for out in outputs:
-        label = out["label"].lower()
-        score_map[label] = out["score"]
+def finbert_tone_sentiment(text: str) -> float:
+    inputs = tokenizer(text, return_tensors="tf", truncation=True)
+    outputs = finbert_model(inputs)
+    logits = outputs.logits
+    probs = tf.nn.softmax(logits, axis=-1)[0].numpy()
 
-    pos = score_map.get("positive", 0.0)
-    neg = score_map.get("negative", 0.0)
-    neu = score_map.get("neutral", 0.0)
+    pos = probs[0]
+    neg = probs[1]
+    neu = probs[2]
 
-    # Simple expectation: positive - negative
-    return pos - neg  # roughly in [-1, 1]
+    return pos - neg  # maps to [-1, 1]
 
 
 @st.cache_data(show_spinner=False)
@@ -125,13 +108,13 @@ def compute_combined_sentiment_for_ticker(ticker: str, max_headlines: int = 15) 
 
     for h in headlines:
         vader_scores.append(vader_sentiment(h))
-        finbert_scores.append(finbert_sentiment(h))
+        finbert_scores.append(finbert_tone_sentiment(h))
 
     vader_avg = sum(vader_scores) / len(vader_scores)
     finbert_avg = sum(finbert_scores) / len(finbert_scores)
 
-    # Weighted combo: 40% VADER, 60% FinBERT
-    combined = 0.4 * vader_avg + 0.6 * finbert_avg
+    # Weighted: 30% VADER, 70% FinBERT-tone
+    combined = 0.3 * vader_avg + 0.7 * finbert_avg
     return combined
 
 
@@ -170,7 +153,7 @@ def classify_signal(sentiment: float, trend: str) -> str:
 
 
 # -----------------------------
-# UI: Styles
+# UI Styles
 # -----------------------------
 
 st.markdown("""
@@ -227,7 +210,6 @@ st.markdown("""
     font-weight: 600;
 }
 
-/* Sentiment bar */
 .sentiment-bar-container {
     width: 100%;
     height: 4px;
@@ -246,7 +228,7 @@ st.markdown("""
 
 
 # -----------------------------
-# Helpers for UI
+# Helpers
 # -----------------------------
 
 def trend_icon(trend: str) -> str:
@@ -265,18 +247,15 @@ def card_color(signal: str) -> str:
     else:
         return "#BDC3C7"
 
-def sentiment_bar_style(sentiment: float) -> (str, float):
-    """
-    Returns (color, width_percent) for the sentiment bar.
-    """
+def sentiment_bar_style(sentiment: float):
     magnitude = min(abs(sentiment), 1.0)
     width = magnitude * 100.0
     if sentiment > 0.05:
-        color = "#27AE60"  # green
+        color = "#27AE60"
     elif sentiment < -0.05:
-        color = "#C0392B"  # red
+        color = "#C0392B"
     else:
-        color = "#7F8C8D"  # gray
+        color = "#7F8C8D"
     return color, width
 
 
@@ -286,7 +265,7 @@ def sentiment_bar_style(sentiment: float) -> (str, float):
 
 st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
-with st.spinner("Analyzing S&P 100... this may take ~20 seconds on first load."):
+with st.spinner("Analyzing S&P 100... first load may take ~20 seconds."):
     results = []
 
     for ticker in sp100:
@@ -303,13 +282,12 @@ with st.spinner("Analyzing S&P 100... this may take ~20 seconds on first load.")
                 "Signal": signal
             })
         except Exception:
-            # Skip tickers that fail
             continue
 
 last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
-
 st.caption(f"Last updated: {last_updated}")
 st.subheader("Market Overview")
+
 
 # -----------------------------
 # Render Card Grid
@@ -335,8 +313,7 @@ for stock in results:
         f'<div class="signal-badge">{stock["Signal"]}</div>'
         f'</div>'
         f'<div class="sentiment-bar-container">'
-        f'<div class="sentiment-bar-fill" '
-        f'style="width:{bar_width}%; background:{bar_color};"></div>'
+        f'<div class="sentiment-bar-fill" style="width:{bar_width}%; background:{bar_color};"></div>'
         f'</div>'
         f'</div>'
         f'</div>'
