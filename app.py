@@ -227,7 +227,10 @@ def sentiment_bar_style(sentiment: float):
 # -----------------------------
 # Layout
 # -----------------------------
-
+  
+last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+st.caption(f"Last updated: {last_updated}")
+st.subheader("Market Overview")
 st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
 progress = st.progress(0)
@@ -240,8 +243,17 @@ for i, ticker in enumerate(sp100):
 
     try:
         prices = get_price_data(ticker)
+        if prices is None or prices.empty:
+            st.write(f"⚠️ Price data failed for {ticker}")
+            continue
+
+        headlines = get_news_headlines(ticker)
+        if not headlines:
+            st.write(f"⚠️ No headlines for {ticker}")
+            continue
+
+        sentiment = compute_sentiment_for_ticker(ticker)
         trend = compute_trend(prices)
-        sentiment = compute_sentiment_for_ticker(ticker, max_headlines=10)
         signal = classify_signal(sentiment, trend)
 
         results.append({
@@ -250,7 +262,9 @@ for i, ticker in enumerate(sp100):
             "Sentiment": round(sentiment, 3),
             "Signal": signal
         })
-    except Exception:
+
+    except Exception as e:
+        st.write(f"❌ Error for {ticker}: {e}")
         continue
 
     progress.progress((i+1) / len(sp100))
@@ -258,9 +272,6 @@ for i, ticker in enumerate(sp100):
 progress.empty()
 status.empty()
 
-last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
-st.caption(f"Last updated: {last_updated}")
-st.subheader("Market Overview")
 
 
 # -----------------------------
