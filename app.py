@@ -4,9 +4,10 @@ import yfinance as yf
 import requests
 import datetime as dt
 import nltk
+import numpy as np
 
-from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
-import tensorflow as tf
+from transformers import AutoTokenizer
+import onnxruntime as ort
 from nltk.sentiment import SentimentIntensityAnalyzer
 
 # Download VADER lexicon
@@ -29,26 +30,30 @@ sp100 = [
     "C","EL","ADP","REGN","BDX","CI","SO","DUK","CL","USB",
     "PNC","CB","TGT","FIS","EQIX","ICE","APD","CSX","NSC","FDX"
 ]
-# Replace with your full S&P 100 list if you already have it.
-
-
 # -----------------------------
-# Load Models (Cached)
+# Load ONNX Model (Cached)
 # -----------------------------
 
 @st.cache_resource
-def load_finbert_tone():
+def load_onnx_finbert():
     model_name = "yiyanghkust/finbert-tone"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = TFAutoModelForSequenceClassification.from_pretrained(model_name)
-    return tokenizer, model
+
+    # Load ONNX model
+    session = ort.InferenceSession(
+        "https://huggingface.co/yiyanghkust/finbert-tone/resolve/main/model.onnx",
+        providers=["CPUExecutionProvider"]
+    )
+
+    return tokenizer, session
+
 
 @st.cache_resource
 def load_vader():
     return SentimentIntensityAnalyzer()
 
 
-tokenizer, finbert_model = load_finbert_tone()
+tokenizer, onnx_session = load_onnx_finbert()
 vader = load_vader()
 
 
@@ -84,17 +89,21 @@ def get_news_headlines(ticker, max_headlines=15):
 def vader_sentiment(text: str) -> float:
     return vader.polarity_scores(text)["compound"]
 
-def finbert_tone_sentiment(text: str) -> float:
-    inputs = tokenizer(text, return_tensors="tf", truncation=True)
-    outputs = finbert_model(inputs)
-    logits = outputs.logits
-    probs = tf.nn.softmax(logits, axis=-1)[0].numpy()
+
+def finbert_onnx_sentiment(text: str) -> float:
+    inputs = tokenizer(text, return_tensors="np", truncation=True)
+    ort_inputs = {k: v for k, v in inputs.items()}
+
+    outputs = onnx_session.run(None, ort_inputs)
+    logits = outputs[0][0]
+
+    probs = np.exp(logits) / np.sum(np.exp(logits))
 
     pos = probs[0]
     neg = probs[1]
     neu = probs[2]
 
-    return pos - neg  # maps to [-1, 1]
+    return float(pos - neg)
 
 
 @st.cache_data(show_spinner=False)
@@ -108,12 +117,12 @@ def compute_combined_sentiment_for_ticker(ticker: str, max_headlines: int = 15) 
 
     for h in headlines:
         vader_scores.append(vader_sentiment(h))
-        finbert_scores.append(finbert_tone_sentiment(h))
+        finbert_scores.append(finbert_onnx_sentiment(h))
 
     vader_avg = sum(vader_scores) / len(vader_scores)
     finbert_avg = sum(finbert_scores) / len(finbert_scores)
 
-    # Weighted: 30% VADER, 70% FinBERT-tone
+    # Weighted: 30% VADER, 70% ONNX FinBERT-tone
     combined = 0.3 * vader_avg + 0.7 * finbert_avg
     return combined
 
