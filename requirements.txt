@@ -1,5 +1,5 @@
 transformers
-tensorflow
+onnxruntime
 nltk
 yfinance
 requests
