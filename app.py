@@ -30,18 +30,22 @@ sp100 = [
     "C","EL","ADP","REGN","BDX","CI","SO","DUK","CL","USB",
     "PNC","CB","TGT","FIS","EQIX","ICE","APD","CSX","NSC","FDX"
 ]
+
 # -----------------------------
-# Load ONNX Model (Cached)
+# Load ONNX FinBERT (Cached)
 # -----------------------------
 
 @st.cache_resource
 def load_onnx_finbert():
-    model_name = "yiyanghkust/finbert-tone"
+    model_name = "ProsusAI/finbert"
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    # Load ONNX model
+    # ONNX model hosted on HuggingFace
+    onnx_url = "https://huggingface.co/ProsusAI/finbert/resolve/main/model.onnx"
+
     session = ort.InferenceSession(
-        "https://huggingface.co/yiyanghkust/finbert-tone/resolve/main/model.onnx",
+        onnx_url,
         providers=["CPUExecutionProvider"]
     )
 
@@ -122,7 +126,7 @@ def compute_combined_sentiment_for_ticker(ticker: str, max_headlines: int = 15) 
     vader_avg = sum(vader_scores) / len(vader_scores)
     finbert_avg = sum(finbert_scores) / len(finbert_scores)
 
-    # Weighted: 30% VADER, 70% ONNX FinBERT-tone
+    # Weighted: 30% VADER, 70% FinBERT (ONNX)
     combined = 0.3 * vader_avg + 0.7 * finbert_avg
     return combined
 
