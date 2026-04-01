@@ -4,10 +4,7 @@ import yfinance as yf
 import requests
 import datetime as dt
 import nltk
-import numpy as np
 
-from transformers import AutoTokenizer
-import onnxruntime as ort
 from nltk.sentiment import SentimentIntensityAnalyzer
 
 # Download VADER lexicon
@@ -19,45 +16,19 @@ st.set_page_config(page_title="Stock Trend & Sentiment Dashboard", layout="wide"
 # S&P 100 Tickers (placeholder)
 # -----------------------------
 sp100 = [
-    "AAPL","MSFT","AMZN","GOOGL","GOOG","BRK-B","NVDA","META","TSLA","UNH",
-    "JNJ","V","XOM","JPM","PG","MA","HD","CVX","LLY","ABBV",
-    "PEP","KO","PFE","BAC","AVGO","COST","MRK","TMO","DIS","WMT",
-    "CSCO","ABT","ACN","DHR","MCD","ADBE","NFLX","CRM","TXN","LIN",
-    "CMCSA","NKE","WFC","INTC","HON","PM","UNP","MS","AMGN","UPS",
-    "QCOM","SCHW","RTX","LOW","NEE","IBM","SBUX","MDT","CAT","GS",
-    "BLK","AMT","CVS","DE","SPGI","PLD","INTU","SYK","BKNG","ISRG",
-    "MDLZ","T","ADI","ZTS","MO","GILD","LMT","AXP","NOW","MMC",
-    "C","EL","ADP","REGN","BDX","CI","SO","DUK","CL","USB",
-    "PNC","CB","TGT","FIS","EQIX","ICE","APD","CSX","NSC","FDX"
+    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "JPM", "JNJ", "V",
+    "PG", "NVDA", "HD", "UNH", "MA", "DIS", "PYPL", "BAC", "XOM", "INTC"
 ]
 
+
 # -----------------------------
-# Load ONNX FinBERT (Cached)
+# Load VADER (Cached)
 # -----------------------------
-
-@st.cache_resource
-def load_onnx_finbert():
-    model_name = "ProsusAI/finbert"
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    # ONNX model hosted on HuggingFace
-    onnx_url = "https://huggingface.co/ProsusAI/finbert/resolve/main/model.onnx"
-
-    session = ort.InferenceSession(
-        onnx_url,
-        providers=["CPUExecutionProvider"]
-    )
-
-    return tokenizer, session
-
 
 @st.cache_resource
 def load_vader():
     return SentimentIntensityAnalyzer()
 
-
-tokenizer, onnx_session = load_onnx_finbert()
 vader = load_vader()
 
 
@@ -70,7 +41,7 @@ def get_price_data(ticker, period="6mo", interval="1d"):
     return yf.download(ticker, period=period, interval=interval, progress=False)
 
 @st.cache_data(show_spinner=False)
-def get_news_headlines(ticker, max_headlines=15):
+def get_news_headlines(ticker, max_headlines=10):
     url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
     resp = requests.get(url, timeout=10)
     headlines = []
@@ -93,42 +64,14 @@ def get_news_headlines(ticker, max_headlines=15):
 def vader_sentiment(text: str) -> float:
     return vader.polarity_scores(text)["compound"]
 
-
-def finbert_onnx_sentiment(text: str) -> float:
-    inputs = tokenizer(text, return_tensors="np", truncation=True)
-    ort_inputs = {k: v for k, v in inputs.items()}
-
-    outputs = onnx_session.run(None, ort_inputs)
-    logits = outputs[0][0]
-
-    probs = np.exp(logits) / np.sum(np.exp(logits))
-
-    pos = probs[0]
-    neg = probs[1]
-    neu = probs[2]
-
-    return float(pos - neg)
-
-
 @st.cache_data(show_spinner=False)
-def compute_combined_sentiment_for_ticker(ticker: str, max_headlines: int = 15) -> float:
+def compute_sentiment_for_ticker(ticker: str, max_headlines: int = 10) -> float:
     headlines = get_news_headlines(ticker, max_headlines=max_headlines)
     if not headlines:
         return 0.0
 
-    vader_scores = []
-    finbert_scores = []
-
-    for h in headlines:
-        vader_scores.append(vader_sentiment(h))
-        finbert_scores.append(finbert_onnx_sentiment(h))
-
-    vader_avg = sum(vader_scores) / len(vader_scores)
-    finbert_avg = sum(finbert_scores) / len(finbert_scores)
-
-    # Weighted: 30% VADER, 70% FinBERT (ONNX)
-    combined = 0.3 * vader_avg + 0.7 * finbert_avg
-    return combined
+    scores = [vader_sentiment(h) for h in headlines]
+    return sum(scores) / len(scores)
 
 
 # -----------------------------
@@ -278,14 +221,14 @@ def sentiment_bar_style(sentiment: float):
 
 st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
-with st.spinner("Analyzing S&P 100... first load may take ~20 seconds."):
+with st.spinner("Analyzing S&P 100..."):
     results = []
 
     for ticker in sp100:
         try:
             prices = get_price_data(ticker)
             trend = compute_trend(prices)
-            sentiment = compute_combined_sentiment_for_ticker(ticker, max_headlines=15)
+            sentiment = compute_sentiment_for_ticker(ticker, max_headlines=10)
             signal = classify_signal(sentiment, trend)
 
             results.append({
