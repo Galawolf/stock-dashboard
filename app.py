@@ -227,11 +227,6 @@ def sentiment_bar_style(sentiment: float):
 # -----------------------------
 # Layout
 # -----------------------------
-  
-last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
-st.caption(f"Last updated: {last_updated}")
-st.subheader("Market Overview")
-st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
 progress = st.progress(0)
 status = st.empty()
@@ -272,6 +267,11 @@ for i, ticker in enumerate(sp100):
 progress.empty()
 status.empty()
 
+  
+last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+st.caption(f"Last updated: {last_updated}")
+st.subheader("Market Overview")
+st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
 
 # -----------------------------
