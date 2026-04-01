@@ -230,24 +230,33 @@ def sentiment_bar_style(sentiment: float):
 
 st.title("Stock Trend & Sentiment Dashboard (S&P 100)")
 
-with st.spinner("Analyzing S&P 100..."):
-    results = []
+progress = st.progress(0)
+status = st.empty()
 
-    for ticker in sp100:
-        try:
-            prices = get_price_data(ticker)
-            trend = compute_trend(prices)
-            sentiment = compute_sentiment_for_ticker(ticker, max_headlines=10)
-            signal = classify_signal(sentiment, trend)
+results = []
 
-            results.append({
-                "Ticker": ticker,
-                "Trend": trend,
-                "Sentiment": round(sentiment, 3),
-                "Signal": signal
-            })
-        except Exception:
-            continue
+for i, ticker in enumerate(sp100):
+    status.write(f"Processing {ticker} ({i+1}/{len(sp100)})...")
+
+    try:
+        prices = get_price_data(ticker)
+        trend = compute_trend(prices)
+        sentiment = compute_sentiment_for_ticker(ticker, max_headlines=10)
+        signal = classify_signal(sentiment, trend)
+
+        results.append({
+            "Ticker": ticker,
+            "Trend": trend,
+            "Sentiment": round(sentiment, 3),
+            "Signal": signal
+        })
+    except Exception:
+        continue
+
+    progress.progress((i+1) / len(sp100))
+
+progress.empty()
+status.empty()
 
 last_updated = dt.datetime.now().strftime("%Y-%m-%d %I:%M %p")
 st.caption(f"Last updated: {last_updated}")
