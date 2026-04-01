@@ -1,4 +1,6 @@
-nltk
+streamlit
+pandas
 yfinance
 requests
-pandas
+nltk
+lxml
