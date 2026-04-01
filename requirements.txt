@@ -1,6 +1,6 @@
-streamlit
-yfinance
-pandas
-numpy
+transformers
+tensorflow
 nltk
-feedparser
+yfinance
+requests
+pandas
