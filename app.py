@@ -5,13 +5,10 @@ import requests
 import datetime as dt
 import nltk
 import xml.etree.ElementTree as ET
+import time
 from nltk.sentiment import SentimentIntensityAnalyzer
 
-# -----------------------------
-# Setup & Resource Loading
-# -----------------------------
-
-# Download VADER lexicon
+# 1. Setup & Resource Loading
 nltk.download("vader_lexicon", quiet=True)
 
 st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
@@ -20,80 +17,77 @@ st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
 def get_vader():
     return SentimentIntensityAnalyzer()
 
-# -----------------------------
-# CSS Styling
-# -----------------------------
-
+# 2. CSS Styling (Modern Dark-ish Cards)
 st.markdown("""
 <style>
     .card-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         grid-gap: 15px;
         margin-top: 20px;
     }
     .stock-card {
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 15px;
         color: white;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        height: 150px;
+        height: 160px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        font-family: sans-serif;
+        font-family: 'Inter', sans-serif;
     }
-    .ticker { font-size: 22px; font-weight: bold; }
+    .ticker { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
     .signal-badge {
-        background: rgba(255,255,255,0.2);
-        padding: 2px 8px;
-        border-radius: 5px;
+        background: rgba(255,255,255,0.25);
+        padding: 4px 10px;
+        border-radius: 6px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
+        text-transform: uppercase;
     }
     .sentiment-bg {
-        background: rgba(0,0,0,0.1);
-        height: 6px;
-        border-radius: 3px;
-        margin-top: 8px;
+        background: rgba(0,0,0,0.15);
+        height: 8px;
+        border-radius: 4px;
+        margin-top: 10px;
+        overflow: hidden;
     }
-    .sentiment-fill { height: 100%; border-radius: 3px; }
+    .sentiment-fill { height: 100%; border-radius: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Data Processing Engine
-# -----------------------------
-
-@st.cache_data(ttl=3600)  # Cache results for 1 hour
+# 3. The "Engine" - Fetches and Processes Data
+@st.cache_data(ttl=3600)
 def fetch_market_data(ticker_list):
     vader = get_vader()
     processed_data = []
     
-    # Progress bar for the initial load
     progress_bar = st.progress(0)
+    status_text = st.empty()
     
     for idx, ticker in enumerate(ticker_list):
+        status_text.text(f"Scanning {ticker}...")
         try:
-            # 1. Fetch Price (Fixing the Multi-Index Issue)
+            # A. Fetch Price (Handles the Multi-Index bug)
             df = yf.download(ticker, period="6mo", interval="1d", progress=False)
             if df.empty: continue
             
-            # Extract Close prices safely
             if isinstance(df.columns, pd.MultiIndex):
                 close_prices = df['Close'][ticker].dropna()
             else:
                 close_prices = df['Close'].dropna()
 
-            # 2. Trend Logic
-            start_p, end_p = close_prices.iloc[0], close_prices.iloc[-1]
+            if len(close_prices) < 2: continue
+
+            # B. Trend Logic
+            start_p, end_p = float(close_prices.iloc[0]), float(close_prices.iloc[-1])
             change = (end_p - start_p) / start_p
             trend = "Uptrend" if change > 0.03 else "Downtrend" if change < -0.03 else "Neutral"
 
-            # 3. News & Sentiment Logic
+            # C. News & Sentiment
             url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            resp = requests.get(url, headers=headers, timeout=5)
+            resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             
             sent_score = 0.0
             if resp.status_code == 200:
@@ -102,17 +96,14 @@ def fetch_market_data(ticker_list):
                 if titles:
                     scores = [vader.polarity_scores(t)["compound"] for t in titles]
                     sent_score = sum(scores) / len(scores)
-
-            # 4. Final Classification
+            
+            # D. Signal Logic
             if sent_score > 0.12 and trend == "Uptrend":
-                signal = "Potential Buy"
-                color = "#27AE60"
+                signal, color = "Potential Buy", "#27AE60"
             elif sent_score < -0.12 and trend == "Downtrend":
-                signal = "Avoid"
-                color = "#C0392B"
+                signal, color = "Avoid", "#C0392B"
             else:
-                signal = "Watch"
-                color = "#7F8C8D"
+                signal, color = "Watch", "#7F8C8D"
 
             processed_data.append({
                 "ticker": ticker,
@@ -122,66 +113,58 @@ def fetch_market_data(ticker_list):
                 "color": color,
                 "icon": "▲" if trend == "Uptrend" else "▼" if trend == "Downtrend" else "•"
             })
+            time.sleep(0.05) # Prevent hitting rate limits
         except Exception:
             continue
         
         progress_bar.progress((idx + 1) / len(ticker_list))
     
     progress_bar.empty()
-    return processed_data
+    status_text.empty()
+    return processed_data # This MUST be outside the 'for' loop
 
-# -----------------------------
-# UI Logic
-# -----------------------------
+# 4. Main UI App
+st.title("📈 S&P 100 Sentiment Scanner")
 
-sp100 = [
-    "AAPL","ABBV","ABT","ACN","ADBE","AMD","AMGN","AMZN","AVGO","AXP",
-    "BA","BAC","BLK","BMY","BRK-B","C","CAT","COST","CRM","CSCO",
-    "CVS","CVX","DIS","GE","GOOGL","GS","HD","IBM","INTC","JNJ",
-    "JPM","KO","LLY","LMT","MA","MCD","META","MMM","MSFT","NFLX",
-    "NKE","NVDA","ORCL","PEP","PFE","PG","PYPL","QCOM","SBUX","T",
-    "TGT","TSLA","UNH","V","VZ","WFC","WMT","XOM"
-]
+# Tickers (Shortened for initial speed, add more as needed)
+tickers = ["AAPL","AMZN","GOOGL","MSFT","NVDA","TSLA","META","NFLX","AMD","DIS","JPM","V","GS","WMT","KO","PEP"]
 
-st.title("📈 S&P 100 Sentiment & Trend Scanner")
-st.write("Real-time analysis of price action and news sentiment.")
-
-if st.button("🔄 Refresh Market Scan"):
+if st.button("🔄 Refresh Data"):
     st.cache_data.clear()
     st.rerun()
 
-with st.spinner("Analyzing 60+ tickers... Please wait."):
-    data = fetch_market_data(sp100)
+with st.spinner("Analyzing Market..."):
+    results = fetch_market_data(tickers)
 
-# Build HTML Grid
-html_grid = '<div class="card-grid">'
-for item in data:
-    # Sentiment bar math
-    bar_width = min(abs(item['sentiment']) * 100, 100)
-    bar_color = "#FFF" if abs(item['sentiment']) > 0.05 else "rgba(255,255,255,0.3)"
-    
-    html_grid += f"""
-    <div class="stock-card" style="background-color: {item['color']};">
-        <div>
-            <div class="ticker">{item['ticker']} <span style="float:right; font-size:14px;">{item['icon']}</span></div>
-            <div style="font-size:11px; opacity:0.8;">{item['trend']}</div>
-        </div>
-        <div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:10px;">Sent: {item['sentiment']}</span>
-                <span class="signal-badge">{item['signal']}</span>
+# Render results in the grid
+if results:
+    html_grid = '<div class="card-grid">'
+    for item in results:
+        bar_width = min(abs(item['sentiment']) * 100, 100)
+        # Choose bar color based on positive/negative
+        bar_color = "#2ecc71" if item['sentiment'] > 0 else "#e74c3c" if item['sentiment'] < 0 else "#bdc3c7"
+        
+        html_grid += f"""
+        <div class="stock-card" style="background-color: {item['color']};">
+            <div>
+                <div class="ticker">{item['ticker']} <span style="float:right; font-size:16px;">{item['icon']}</span></div>
+                <div style="font-size:12px; opacity:0.9;">{item['trend']}</div>
             </div>
-            <div class="sentiment-bg">
-                <div class="sentiment-fill" style="width: {bar_width}%; background: {bar_color};"></div>
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:bold;">Sent: {item['sentiment']}</span>
+                    <span class="signal-badge">{item['signal']}</span>
+                </div>
+                <div class="sentiment-bg">
+                    <div class="sentiment-fill" style="width: {bar_width}%; background: white; opacity: 0.6;"></div>
+                </div>
             </div>
         </div>
-    </div>
-    """
-html_grid += '</div>'
-
-st.markdown(html_grid, unsafe_allow_html=True)
+        """
+    html_grid += '</div>'
+    st.markdown(html_grid, unsafe_allow_html=True)
+else:
+    st.error("No data could be retrieved. Check your internet connection or ticker list.")
 
 st.divider()
-st.caption(f"Last Full Scan: {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-# Add the unsafe_allow_html=True parameter
-st.markdown(html_grid, unsafe_allow_html=True)
+st.caption(f"Last Scan: {dt.datetime.now().strftime('%H:%M:%S')}")
